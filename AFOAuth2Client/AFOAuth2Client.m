@@ -312,6 +312,39 @@ static NSMutableDictionary * AFKeychainQueryDictionaryWithIdentifier(NSString *i
     return (status == errSecSuccess);
 }
 
++ (BOOL)storeCredential:(AFOAuthCredential *)credential
+         withIdentifier:(NSString *)identifier
+      withAccessibility:(id)securityAccessibility
+{
+    NSMutableDictionary *queryDictionary = AFKeychainQueryDictionaryWithIdentifier(identifier);
+
+    if (!credential) {
+        return [self deleteCredentialWithIdentifier:identifier];
+    }
+
+    NSMutableDictionary *updateDictionary = [NSMutableDictionary dictionary];
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:credential];
+    [updateDictionary setObject:data forKey:(__bridge id)kSecValueData];
+    if (securityAccessibility) {
+        [updateDictionary setObject:securityAccessibility forKey:(__bridge id)kSecAttrAccessible];
+    }
+
+    OSStatus status;
+    BOOL exists = ([self retrieveCredentialWithIdentifier:identifier] != nil);
+
+    if (exists) {
+        status = SecItemUpdate((__bridge CFDictionaryRef)queryDictionary, (__bridge CFDictionaryRef)updateDictionary);
+    } else {
+        [queryDictionary addEntriesFromDictionary:updateDictionary];
+        status = SecItemAdd((__bridge CFDictionaryRef)queryDictionary, NULL);
+    }
+
+    if (status != errSecSuccess) {
+        NSLog(@"Unable to %@ credential with identifier \"%@\" (Error %li)", exists ? @"update" : @"add", identifier, (long int)status);
+    }
+
+    return (status == errSecSuccess);
+}
 + (BOOL)deleteCredentialWithIdentifier:(NSString *)identifier {
     NSMutableDictionary *queryDictionary = AFKeychainQueryDictionaryWithIdentifier(identifier);
     
